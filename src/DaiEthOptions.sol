@@ -32,6 +32,8 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
 
     uint256 public optionCounter;
 
+    uint256 public optionId;
+
     mapping(address => address) public tokenToEthFeed;
     mapping(uint256 => Option) public optionIdToOption;
     mapping(address => uint256[]) public tradersPosition;
@@ -77,6 +79,7 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
     ///----------------------------------------///
 
     event CallOptionOpen(
+        uint256 id,
         address writer,
         uint256 amount,
         uint256 strike,
@@ -85,6 +88,7 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
         uint256 value
     );
     event PutOptionOpen(
+        uint256 id,
         address writer,
         uint256 amount,
         uint256 strike,
@@ -98,7 +102,6 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
     event PutOptionExercised(address buyer, uint256 id);
     event OptionExpiresWorthless(address buyer, uint256 Id);
     event FundsRetrieved(address writer, uint256 id, uint256 value);
-    event AllowedTokenSet(address token, address priceFeed);
 
     ///-----------------------------------------///
     ///--------------CONSTRUCTOR
@@ -135,9 +138,10 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
         );
 
         tradersPosition[msg.sender].push(optionCounter);
-        optionCounter++;
+        optionId = optionCounter++;
 
         emit CallOptionOpen(
+            optionId,
             msg.sender,
             _amount,
             _strike,
@@ -166,7 +170,8 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
         if (!paid) revert TransferFailed();
 
         //dai transfered to writer
-        dai.transfer(option.writer, option.premiumDue);
+        paid = dai.transfer(payable(option.writer), option.premiumDue);
+        if (!paid) revert TransferFailed();
 
         optionIdToOption[_optionId].buyer = msg.sender;
         optionIdToOption[_optionId].optionState = OptionState.Bought;
@@ -185,7 +190,7 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
 
         require(msg.sender == option.buyer, "NOT BUYER");
         require(option.optionState == OptionState.Bought, "NEVER BOUGHT");
-        require(option.expiration > block.timestamp, "HAS NOT EXPIRED");
+        require(option.expiration <= block.timestamp, "CALL NOT EXPIRED");
 
         uint256 marketPrice = option.amount * priceFeedServer.getPriceFeed();
 
@@ -196,10 +201,12 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
         if (!paid) revert TransferFailed();
 
         //transfer to msg.sender the writer's ETH collateral
-        payable(msg.sender).transfer(option.collateral);
+        (paid, ) = payable(msg.sender).call{value: option.collateral}("");
+        if (!paid) revert TransferFailed();
 
         //transfer dai to option writer
-        dai.transfer(option.writer, option.strike);
+        paid = dai.transfer(option.writer, option.strike);
+        if (!paid) revert TransferFailed();
 
         optionIdToOption[_optionId].optionState = OptionState.Exercised;
 
@@ -231,9 +238,10 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
         );
 
         tradersPosition[msg.sender].push(optionCounter);
-        optionCounter++;
+        optionId = optionCounter++;
 
         emit PutOptionOpen(
+            optionId,
             msg.sender,
             _amount,
             _strike,
@@ -262,13 +270,14 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
         if (!paid) revert TransferFailed();
 
         //transfer premium to writer
-        dai.transfer(option.writer, option.premiumDue);
+        paid = dai.transfer(option.writer, option.premiumDue);
+        if (!paid) revert TransferFailed();
 
         optionIdToOption[_optionId].buyer = msg.sender;
         optionIdToOption[_optionId].optionState = OptionState.Bought;
         tradersPosition[msg.sender].push(_optionId);
 
-        emit CallOptionBought(msg.sender, _optionId);
+        emit PutOptionBought(msg.sender, _optionId);
     }
 
     function exercisePutOption(uint256 _optionId)
@@ -281,7 +290,7 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
 
         require(msg.sender == option.buyer, "NOT BUYER");
         require(option.optionState == OptionState.Bought, "NEVER BOUGHT");
-        require(option.expiration > block.timestamp, "HAS NOT EXPIRED");
+        require(option.expiration <= block.timestamp, "PUT NOT EXPIRED");
 
         uint256 marketPrice = option.amount * priceFeedServer.getPriceFeed();
 
@@ -291,10 +300,12 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
         bool paid = dai.transferFrom(msg.sender, address(this), option.strike);
         if (!paid) revert TransferFailed();
 
-        payable(msg.sender).transfer(option.collateral);
+        (paid, ) = payable(msg.sender).call{value: option.collateral}("");
+        if (!paid) revert TransferFailed();
 
         //transfer dai to option writer
-        dai.transfer(option.writer, option.strike);
+        paid = dai.transfer(option.writer, option.strike);
+        if (!paid) revert TransferFailed();
 
         optionIdToOption[_optionId].optionState = OptionState.Exercised;
 
@@ -313,7 +324,7 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
 
         require(option.optionState == OptionState.Bought, "NEVER BOUGHT");
         require(optionIdToOption[_optionId].buyer == msg.sender, "NOT BUYER");
-        require(option.expiration > block.timestamp, "NOT EXPIRED");
+        require(option.expiration < block.timestamp, "NOT EXPIRED");
 
         uint256 marketPrice = option.amount * priceFeedServer.getPriceFeed();
 
@@ -336,11 +347,12 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
     function retrieveExpiredFunds(uint256 _optionId) external nonReentrant {
         Option memory option = optionIdToOption[_optionId];
 
-        require(option.optionState == OptionState.Cancelled);
+        require(option.optionState == OptionState.Cancelled, "NOT CANCELLED");
         require(option.expiration < block.timestamp, "NOT EXPIRED");
         require(msg.sender == option.writer, "NOT WRITER");
 
-        payable(msg.sender).transfer(option.collateral);
+        (bool paid, ) = payable(msg.sender).call{value: option.collateral}("");
+        if (!paid) revert TransferFailed();
 
         emit FundsRetrieved(msg.sender, _optionId, option.collateral);
     }
@@ -375,13 +387,13 @@ contract DaiEthOptions is ReentrancyGuard, Ownable {
         _;
     }
 
-    modifier optionExists(uint256 optionId) {
+    modifier optionExists(uint256 id) {
         if (optionIdToOption[optionId].writer == address(0))
             revert OptionNotValid(optionId);
         _;
     }
 
-    modifier isValidOpenOption(uint256 optionId) {
+    modifier isValidOpenOption(uint256 id) {
         if (
             optionIdToOption[optionId].optionState != OptionState.Open ||
             optionIdToOption[optionId].expiration > block.timestamp
