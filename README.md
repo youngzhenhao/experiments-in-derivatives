@@ -2,6 +2,8 @@
 
 This repo is Based off this [PR](https://github.com/smartcontractkit/defi-minimal/pull/3) I made. 
 
+A work in progress...
+
 Plan to work out ideas around: 
 
 - Vaults
