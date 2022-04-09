@@ -2,7 +2,6 @@
 pragma solidity >=0.8.7 <0.9.0;
 
 import "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
-import "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "./PriceFeedConsumer.sol";
 
@@ -20,7 +19,7 @@ import "./PriceFeedConsumer.sol";
 /// Probable strategy for option writer:
 /// Cash-secured Puts - Writer earns yield on cash (Bullish).
 
-contract PutOptions is ReentrancyGuard, Ownable {
+contract PutOptions is ReentrancyGuard {
     ///-----------------------------------------///
     ///--------------STORAGE
     ///----------------------------------------///
@@ -28,8 +27,6 @@ contract PutOptions is ReentrancyGuard, Ownable {
     PriceFeedConsumer internal priceFeed;
 
     IERC20 dai;
-
-    uint256 public optionCounter;
 
     uint256 public optionId;
 
@@ -68,6 +65,7 @@ contract PutOptions is ReentrancyGuard, Ownable {
     ///--------------ERRORS
     ///----------------------------------------///
 
+    error Unauthorized();
     error TransferFailed();
     error OptionNotValid(uint256 _optionId);
 
@@ -76,34 +74,32 @@ contract PutOptions is ReentrancyGuard, Ownable {
     ///----------------------------------------///
 
     event PutOptionOpen(
+        address indexed writer,
         uint256 id,
-        address writer,
-        uint256 strike,
-        uint256 premium,
         uint256 expiration,
         uint256 value
     );
 
-    event PutOptionBought(address buyer, uint256 id);
-    event PutOptionExercised(address buyer, uint256 id);
-    event OptionExpiresWorthless(address buyer, uint256 Id);
-    event FundsRetrieved(address writer, uint256 id, uint256 value);
+    event PutOptionBought(address indexed buyer, uint256 id);
+    event PutOptionExercised(address indexed buyer, uint256 id);
+    event OptionExpiresWorthless(address indexed buyer, uint256 Id);
+    event FundsRetrieved(address indexed writer, uint256 id, uint256 value);
 
     ///-----------------------------------------///
     ///--------------MODIFIERS
     ///----------------------------------------///
 
     modifier optionExists(uint256 id) {
-        if (optionIdToOption[optionId].writer == address(0))
-            revert OptionNotValid(optionId);
+        if (optionIdToOption[id].writer == address(0))
+            revert OptionNotValid(id);
         _;
     }
 
     modifier isValidOpenOption(uint256 id) {
         if (
-            optionIdToOption[optionId].optionState != OptionState.Open ||
-            optionIdToOption[optionId].expiration > block.timestamp
-        ) revert OptionNotValid(optionId);
+            optionIdToOption[id].optionState != OptionState.Open ||
+            optionIdToOption[id].expiration > block.timestamp
+        ) revert OptionNotValid(id);
         _;
     }
 
@@ -124,44 +120,46 @@ contract PutOptions is ReentrancyGuard, Ownable {
     function writePutOption(
         uint256 _strike,
         uint256 _premiumDue,
-        uint256 _daysToExpiry
+        uint256 _secondsToExpiry
     ) external payable {
-        require(msg.value == _strike, "PUT: NO ETH COLLATERAL");
+        //To simplify, we only make one strike available, strike is the current marketprice.
+        if (msg.value != _strike) {
+            revert Unauthorized();
+        }
 
-        optionIdToOption[optionCounter] = Option(
+        ++optionId;
+
+        optionIdToOption[optionId] = Option(
             msg.sender,
             address(0),
             _strike,
             _premiumDue,
-            block.timestamp + _daysToExpiry,
+            block.timestamp + _secondsToExpiry,
             msg.value,
             OptionState.Open,
             OptionType.Put
         );
 
-        tradersPosition[msg.sender].push(optionCounter);
-        optionId = optionCounter++;
+        tradersPosition[msg.sender].push(optionId);
 
         emit PutOptionOpen(
-            optionId,
             msg.sender,
-            _strike,
-            _premiumDue,
-            block.timestamp + _daysToExpiry,
+            optionId,
+            block.timestamp + _secondsToExpiry,
             msg.value
         );
     }
 
     ///@dev Buy an available put option, for this example, we use DAI
-    function buyPutOption(uint256 _optionId)
-        external
-        optionExists(_optionId)
-        isValidOpenOption(_optionId)
-        nonReentrant
-    {
+    function buyPutOption(uint256 _optionId) external nonReentrant {
         Option memory option = optionIdToOption[_optionId];
 
-        require(option.optionType == OptionType.Put, "NOT A PUT");
+        if (
+            option.optionType != OptionType.Put ||
+            option.optionState != OptionState.Open
+        ) {
+            revert Unauthorized();
+        }
 
         //pay premium w DAI
         bool paid = dai.transferFrom(
@@ -260,4 +258,6 @@ contract PutOptions is ReentrancyGuard, Ownable {
 
         emit FundsRetrieved(msg.sender, _optionId, option.collateral);
     }
+
+    receive() external payable {}
 }

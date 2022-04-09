@@ -2,7 +2,6 @@
 pragma solidity >=0.8.7 <0.9.0;
 
 import "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
-import "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "./PriceFeedConsumer.sol";
 
@@ -20,7 +19,7 @@ import "./PriceFeedConsumer.sol";
 /// Probable strategy for option writer:
 ///1. Covered Calls - You sell upside on an asset while you hold it for yield, which comes from premium (Netural/Bullish on asset).
 
-contract CallOptions is ReentrancyGuard, Ownable {
+contract CallOptions is ReentrancyGuard {
     ///-----------------------------------------///
     ///--------------STORAGE
     ///----------------------------------------///
@@ -40,6 +39,7 @@ contract CallOptions is ReentrancyGuard, Ownable {
     ///----------------------------------------///
 
     enum OptionState {
+        Closed,
         Open,
         Bought,
         Cancelled,
@@ -66,6 +66,7 @@ contract CallOptions is ReentrancyGuard, Ownable {
     ///--------------ERRORS
     ///----------------------------------------///
 
+    error Unauthorized();
     error TransferFailed();
     error OptionNotValid(uint256 _optionId);
 
@@ -74,34 +75,31 @@ contract CallOptions is ReentrancyGuard, Ownable {
     ///----------------------------------------///
 
     event CallOptionOpen(
+        address indexed writer,
         uint256 id,
-        address writer,
-        uint256 strike,
-        uint256 premium,
         uint256 expiration,
         uint256 value
     );
-
-    event CallOptionBought(address buyer, uint256 id);
-    event CallOptionExercised(address buyer, uint256 id);
-    event OptionExpiresWorthless(address buyer, uint256 Id);
-    event FundsRetrieved(address writer, uint256 id, uint256 value);
+    event CallOptionBought(address indexed buyer, uint256 id);
+    event CallOptionExercised(address indexed buyer, uint256 id);
+    event OptionExpiresWorthless(address indexed buyer, uint256 Id);
+    event FundsRetrieved(address indexed writer, uint256 id, uint256 value);
 
     ///-----------------------------------------///
     ///--------------MODIFIERS
     ///----------------------------------------///
 
     modifier optionExists(uint256 id) {
-        if (optionIdToOption[optionId].writer == address(0))
-            revert OptionNotValid(optionId);
+        if (optionIdToOption[id].writer == address(0))
+            revert OptionNotValid(id);
         _;
     }
 
     modifier isValidOpenOption(uint256 id) {
         if (
-            optionIdToOption[optionId].optionState != OptionState.Open ||
-            optionIdToOption[optionId].expiration > block.timestamp
-        ) revert OptionNotValid(optionId);
+            optionIdToOption[id].optionState != OptionState.Open ||
+            optionIdToOption[id].expiration > block.timestamp
+        ) revert OptionNotValid(id);
         _;
     }
 
@@ -122,32 +120,33 @@ contract CallOptions is ReentrancyGuard, Ownable {
     function writeCallOption(
         uint256 _strike,
         uint256 _premiumDue,
-        uint256 _daysToExpiry
+        uint256 _secondsToExpiry
     ) external payable returns (uint256) {
         //To simplify, we only make one strike available, strike is the current marketprice.
-        require(msg.value == _strike, "CALL: NO ETH COLLATERAL");
+        if (msg.value != _strike) {
+            revert Unauthorized();
+        }
+
+        ++optionId;
 
         optionIdToOption[optionId] = Option(
             msg.sender,
-            address(0),
+            address(0x1),
             _strike,
             _premiumDue,
-            block.timestamp + _daysToExpiry,
+            block.timestamp + _secondsToExpiry,
             //msg.value is the ETH collateral.
             msg.value,
             OptionState.Open,
             OptionType.Call
         );
 
-        ++optionId;
         tradersPosition[msg.sender].push(optionId);
 
         emit CallOptionOpen(
-            optionId,
             msg.sender,
-            _strike,
-            _premiumDue,
-            block.timestamp + _daysToExpiry,
+            optionId,
+            block.timestamp + _secondsToExpiry,
             msg.value
         );
 
@@ -155,16 +154,15 @@ contract CallOptions is ReentrancyGuard, Ownable {
     }
 
     ///@dev Buy an available call option.
-    function buyCallOption(uint256 _optionId)
-        external
-        optionExists(_optionId)
-        isValidOpenOption(_optionId)
-        nonReentrant
-    {
+    function buyCallOption(uint256 _optionId) external nonReentrant {
         Option memory option = optionIdToOption[_optionId];
 
-        require(option.optionType == OptionType.Call, "NOT A CALL");
-        require(option.optionState == OptionState.Open, "NOT AVAILABLE");
+        if (
+            option.optionType != OptionType.Call ||
+            option.optionState != OptionState.Open
+        ) {
+            revert Unauthorized();
+        }
 
         //buyer pays writer w dai
         bool paid = dai.transferFrom(
@@ -261,4 +259,6 @@ contract CallOptions is ReentrancyGuard, Ownable {
 
         emit FundsRetrieved(msg.sender, _optionId, option.collateral);
     }
+
+    receive() external payable {}
 }
