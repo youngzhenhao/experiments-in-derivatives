@@ -3,10 +3,18 @@
 pragma solidity >=0.8.7 <0.9.0;
 
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import "./PriceFeedServer.sol/";
+import "./PriceFeedConsumer.sol/";
+
+///@notice A Perpetual Swap: The trader gets futures exposure with no need to roll the position.
+///Trader can hold the position as long as they want as long as they have the margin.
+///Everyday, traders who are long pay a "funding fee" to those who are short.
+///Funding Fee = (mark price - index price)
+///Mark price == current perp price. Index price == underlying price.
+///In general: If a perp gets more expensive than an underlying, longs will pay high funding fees.
+///This leads to longs selling the perp, returning price to neutral.
 
 contract PerpSwapAsFuture {
-    PriceFeedServer priceFeed;
+    PriceFeedConsumer priceFeed;
     IERC20 dai;
 
     uint256 positionCounter;
@@ -39,16 +47,16 @@ contract PerpSwapAsFuture {
         emit InsuranceDeposit(msg.sender, msg.value);
     }
 
-    function getIndexPrice() public returns (uint256) {
-        uint256 ethPerDai = priceFeed.getPriceFeed();
+    function getIndexPrice(uint256 _amount) public returns (uint256) {
+        uint256 ethPerDai = priceFeed.getPriceFeed(_amount);
         uint256 daiPerEth = 1 / ethPerDai;
         return daiPerEth;
     }
 
-    function fundingFee() public returns (uint256) {
+    function fundingFee(uint256 _amount) public returns (uint256) {
         Position memory position;
         uint256 markPrice = position._markPrice;
-        uint256 indexPrice = getIndexPrice();
+        uint256 indexPrice = getIndexPrice(_amount);
 
         //$(mark - index)/contract/day
         //the longs pay the funding fee to the shorts q 24 hrs
@@ -65,9 +73,9 @@ contract PerpSwapAsFuture {
         userBalance[msg.sender];
     }
 
-    function getPerpSwap(uint256 _positionId) public {
-        Position memory postion = idToPosition[_positionId];
-    }
+    // function getPerpSwap(uint256 _positionId) public {
+    //     Position memory postion = idToPosition[_positionId];
+    // }
 
     function openLongPosition(uint256 _markPrice) public payable {
         //_markPrice = getIndexPrice();
@@ -87,17 +95,17 @@ contract PerpSwapAsFuture {
         positionCounter++;
     }
 
-    function openShortPosition(uint256 _positionId) public {
-        Position memory position = idToPosition[_positionId];
-    }
+    // function openShortPosition(uint256 _positionId) public {
+    //     Position memory position = idToPosition[_positionId];
+    // }
 
-    function closeLongPosition(uint256 _positionId) public {
-        Position memory position = idToPosition[_positionId];
+    // function closeLongPosition(uint256 _positionId) public {
+    //     Position memory position = idToPosition[_positionId];
 
-        PositionState.Closed;
-    }
+    //     PositionState.Closed;
+    // }
 
-    function closeShortPosition(uint256 _positionId) public {
-        Position memory position = idToPosition[_positionId];
-    }
+    // function closeShortPosition(uint256 _positionId) public {
+    //     Position memory position = idToPosition[_positionId];
+    // }
 }
