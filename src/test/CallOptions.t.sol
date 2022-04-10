@@ -3,10 +3,12 @@ pragma solidity >=0.8.7 <0.9.0;
 
 import "ds-test/test.sol";
 import "forge-std/stdlib.sol";
+import "forge-std/console.sol";
 
 import "./mocks/MockV3Aggregator.sol";
 import "./mocks/MockERC20.sol";
 
+import "../PriceFeedConsumer.sol";
 import "../CallOptions.sol";
 
 contract CallOptionsTest is DSTest {
@@ -16,6 +18,7 @@ contract CallOptionsTest is DSTest {
     CallOptions public call;
     MockERC20 public dai;
     MockV3Aggregator public mockV3Aggregator;
+    PriceFeedConsumer public priceFeed;
 
     //mock price feed
     uint8 public constant DECIMALS = 18;
@@ -40,7 +43,9 @@ contract CallOptionsTest is DSTest {
     function setUp() public {
         dai = new MockERC20("DAI COIN", "DAI");
         call = new CallOptions(address(dai));
+
         mockV3Aggregator = new MockV3Aggregator(DECIMALS, INITIAL_ANSWER);
+        priceFeed = new PriceFeedConsumer(address(mockV3Aggregator));
 
         // call.Option storage option = call.Option({
         //     writer: msg.sender,
@@ -51,11 +56,29 @@ contract CallOptionsTest is DSTest {
         //     collateral: 1 ether
         // });
 
-        dai.mint(address(this), 1e8);
-        dai.approve(address(this), 1e8);
+        dai.mint(address(this), 1e18);
+        dai.approve(address(this), 1e18);
     }
 
     receive() external payable {}
+
+    //contract addr checks
+    function test_contractAddrPriceFeed() public {
+        assertTrue(address(priceFeed) != address(0));
+    }
+
+    function test_contractAddrCallOptions() public {
+        assertTrue(address(call) != address(0));
+    }
+
+    function test_contractAddrMockAggr() public {
+        assertTrue(address(mockV3Aggregator) != address(0));
+    }
+
+    function test_contractAddrDai() public {
+        console.log(address(dai));
+        assertTrue(address(dai) != address(0));
+    }
 
     //test dai check
     function test_daiBalance() public {
@@ -65,7 +88,29 @@ contract CallOptionsTest is DSTest {
         assertEq(preBal + 1e8, postBal);
     }
 
-    function test_optionStruct() public {}
+    //optionId check
+    function test_WriteToOptionId() public {
+        stdstore.target(address(call)).sig("optionId()").checked_write(100);
+        assertEq(call.optionId(), 100);
+    }
+
+    // function test_StorageOptionStruct() public {
+    //     uint256 slot = stdstore
+    //         .target(address(call))
+    //         .sig(call.optionIdToOption.selector)
+    //         .with_key(address(this))
+    //         .depth(0)
+    //         .find();
+    //     assertEq(
+    //         uint256(keccak256(abi.encode(address(this), address(this)))),
+    //         slot
+    //     );
+    // }
+
+    function test_WriteToOptionIdFuzz(uint96 _id) public {
+        stdstore.target(address(call)).sig("optionId()").checked_write(_id);
+        assertEq(call.optionId(), _id);
+    }
 
     //Create a call option
     function testFail_writeCallOption() public {
@@ -76,6 +121,19 @@ contract CallOptionsTest is DSTest {
         call.writeCallOption{value: 1 ether}(1 ether, 1, 1);
     }
 
+    function test_writeCallOptionFuzz(
+        uint96 _strike,
+        uint96 _premiumDue,
+        uint96 _secondsToExpiry
+    ) public {
+        _strike = 1 ether;
+        call.writeCallOption{value: 1 ether}(
+            _strike,
+            _premiumDue,
+            _secondsToExpiry
+        );
+    }
+
     function test_writeCallOptionId() public {
         uint256 id1 = call.writeCallOption{value: 1 ether}(1 ether, 1, 1);
         uint256 id2 = call.writeCallOption{value: 1 ether}(1 ether, 1, 1);
@@ -83,8 +141,11 @@ contract CallOptionsTest is DSTest {
     }
 
     function test_emitOpenOption() public {
+        //check topic 0 & 1 (indexed), but not data
         vm.expectEmit(true, true, false, false);
+        //the event expected
         emit CallOptionOpen(address(this), 1, 1, 1 ether);
+        //emits the event
         call.writeCallOption{value: 1 ether}(1 ether, 1, 1);
     }
 
@@ -94,7 +155,7 @@ contract CallOptionsTest is DSTest {
         call.writeCallOption{value: 1 ether}(1 ether, 1, 1);
     }
 
-    function test_writeCallOptionWithWrongValue() public {
+    function testCannot_writeCallOptionWithWrongValue() public {
         vm.expectRevert(Unauthorized.selector);
         call.writeCallOption{value: 1 ether}(1 wei, 1 wei, 60);
     }
@@ -116,29 +177,28 @@ contract CallOptionsTest is DSTest {
         call.writeCallOption{value: 1 wei}(1 wei, 1, 1);
         dai.approve(address(call), 1e8);
 
-        //check topic 1, but not data
         vm.expectEmit(true, false, false, false);
-        //the event expected
         emit CallOptionBought(address(this), 1);
-        //the event we get
         call.buyCallOption(1);
     }
 
-    function test_buyOptionWithWrongId(uint96 _id) public {
+    function testCannot_buyOptionWithWrongIdFuzz(uint96 _id) public {
         vm.assume(_id > 1);
         vm.expectRevert(Unauthorized.selector);
         call.buyCallOption(_id);
     }
 
+    //TODO: Test chainlink price feed called in functions
+
     //Exercise a call option
-    function test_exerciseCallOption() public {
-        call.writeCallOption{value: 1 wei}(1 wei, 1, 1);
-        dai.approve(address(call), 1e8);
-        call.buyCallOption(1);
+    // function test_exerciseCallOption() public {
+    //     call.writeCallOption{value: 1 wei}(1 wei, 1, 60);
+    //     dai.approve(address(call), 1e18);
+    //     call.buyCallOption(1);
 
-        //change block.timestamp
-        vm.warp(90);
+    //     //change block.timestamp
+    //     vm.warp(90);
 
-        call.exerciseCallOption(1, 1e8);
-    }
+    //     call.exerciseCallOption(1, 1e18);
+    // }
 }
