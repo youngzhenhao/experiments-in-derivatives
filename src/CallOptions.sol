@@ -123,9 +123,7 @@ contract CallOptions is ReentrancyGuard {
         uint256 _secondsToExpiry
     ) external payable returns (uint256) {
         //To simplify, we only make one strike available, strike is the current marketprice.
-        if (msg.value != _strike) {
-            revert Unauthorized();
-        }
+        if (msg.value != _strike) revert Unauthorized();
 
         ++optionId;
 
@@ -160,9 +158,7 @@ contract CallOptions is ReentrancyGuard {
         if (
             option.optionType != OptionType.Call ||
             option.optionState != OptionState.Open
-        ) {
-            revert Unauthorized();
-        }
+        ) revert Unauthorized();
 
         //buyer pays writer w dai
         bool paid = dai.transferFrom(
@@ -188,9 +184,12 @@ contract CallOptions is ReentrancyGuard {
     {
         Option memory option = optionIdToOption[_optionId];
 
-        require(msg.sender == option.buyer, "NOT BUYER");
-        require(option.optionState == OptionState.Bought, "NEVER BOUGHT");
-        require(option.expiration <= block.timestamp, "CALL NOT EXPIRED");
+        if (msg.sender != option.buyer) revert Unauthorized();
+        if (option.optionState != OptionState.Bought) revert Unauthorized();
+        if (
+            option.expiration != block.timestamp ||
+            option.expiration > block.timestamp
+        ) revert Unauthorized();
 
         //for dai/eth, chainlink returns x amt of eth for 1 dai
         uint256 marketPriceInEth = priceFeed.getPriceFeed(_amount);
@@ -227,20 +226,21 @@ contract CallOptions is ReentrancyGuard {
     {
         Option memory option = optionIdToOption[_optionId];
 
-        require(option.optionState == OptionState.Bought, "NEVER BOUGHT");
+        if (option.optionState != OptionState.Bought) revert Unauthorized();
+
         //etiher writer or buyer can cancel option after expiration if it is worthless
-        require(
-            optionIdToOption[_optionId].buyer == msg.sender ||
-                optionIdToOption[_optionId].buyer == msg.sender,
-            "NOT BUYER OR WRITER"
-        );
-        require(option.expiration < block.timestamp, "NOT EXPIRED");
-        require(option.optionType == OptionType.Call, "NOT A Call");
+        if (
+            optionIdToOption[_optionId].buyer != msg.sender ||
+            optionIdToOption[_optionId].writer != msg.sender
+        ) revert Unauthorized();
+
+        if (option.expiration > block.timestamp) revert Unauthorized();
+        if (option.optionType != OptionType.Call) revert Unauthorized();
 
         uint256 marketPriceInEth = priceFeed.getPriceFeed(_amount);
 
         //For call, if market < strike, call options expire worthless
-        require(marketPriceInEth < option.strike, "PRICE NOT LESS THAN STRIKE");
+        if (marketPriceInEth >= option.strike) revert Unauthorized();
 
         optionIdToOption[_optionId].optionState = OptionState.Cancelled;
 
@@ -251,8 +251,8 @@ contract CallOptions is ReentrancyGuard {
     function retrieveExpiredFunds(uint256 _optionId) external nonReentrant {
         Option memory option = optionIdToOption[_optionId];
 
-        require(option.optionState == OptionState.Cancelled, "NOT CANCELLED");
-        require(msg.sender == option.writer, "NOT WRITER");
+        if (option.optionState != OptionState.Cancelled) revert Unauthorized();
+        if (msg.sender != option.writer) revert Unauthorized();
 
         (bool paid, ) = payable(msg.sender).call{value: option.collateral}("");
         if (!paid) revert TransferFailed();
