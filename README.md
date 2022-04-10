@@ -9,6 +9,7 @@ Plan to work out ideas around:
 - Vaults
 - Commodities
 - Fractional NFTs
+- Indexes 🤔
 
 This repo is built with [Foundry](https://github.com/gakonst/foundry).
 
