@@ -13,6 +13,8 @@ Plan to work out ideas around:
 
 This repo is built with [Foundry](https://github.com/gakonst/foundry).
 
+**None of this code is meant for production.**
+
 ## Reference
 
 - [Perpetual Swaps](https://research.paradigm.xyz/cartoon-guide-to-perps)
