@@ -17,7 +17,9 @@ contract PerpSwapAsFuture {
     PriceFeedConsumer priceFeed;
     IERC20 dai;
 
-    uint256 positionCounter;
+    uint256 positionId;
+
+    address short;
 
     enum PositionState {
         Open,
@@ -80,7 +82,7 @@ contract PerpSwapAsFuture {
     function openLongPosition(uint256 _markPrice) public payable {
         //_markPrice = getIndexPrice();
 
-        idToPosition[positionCounter] = Position(
+        idToPosition[positionId] = Position(
             msg.sender,
             msg.value,
             _markPrice,
@@ -92,7 +94,7 @@ contract PerpSwapAsFuture {
         uint256 balance = userBalance[msg.sender];
         require(balance >= _markPrice, "Margin must be at least mark price");
 
-        positionCounter++;
+        positionId++;
     }
 
     // function openShortPosition(uint256 _positionId) public {
@@ -108,4 +110,44 @@ contract PerpSwapAsFuture {
     // function closeShortPosition(uint256 _positionId) public {
     //     Position memory position = idToPosition[_positionId];
     // }
+
+    function exchangePerpForEth(uint256 _perpPrice, uint256 _fundingFee)
+        public
+    {
+        //require price of perp < spot price
+        //get diff of (spot - perp price) = x
+        //x / 24 == should be funding fee q hr
+        //so every hour,
+        //trade 1/24 + funding fee to seller
+        //get 1/24 ETH in return
+        //until 24/24 = 1 ETH
+
+        uint256 priceOfDaiInEth = priceFeed.getPriceFeed(1);
+
+        //spot price
+        uint256 priceOfEthInDai = 1 / priceOfDaiInEth;
+
+        require(_perpPrice < priceOfEthInDai);
+
+        uint256 diff = priceOfEthInDai - _perpPrice;
+
+        uint256 toPayToShortInDai = diff / 24;
+
+        //in dai
+        require(toPayToShortInDai == _fundingFee);
+
+        //require that msg.sender received funding fee q hr first?
+        bool paid = dai.transferFrom(
+            msg.sender,
+            address(short),
+            toPayToShortInDai
+        );
+
+        //now 1/24 ETH goes to buyer(msg.sender)
+        uint256 toBuyer = 0.04 ether; //(1/24)
+
+        //eth comes from short,
+        //short puts eth in contract
+        (paid, ) = msg.sender.call{value: toBuyer}("");
+    }
 }

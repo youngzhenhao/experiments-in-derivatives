@@ -16,5 +16,105 @@ import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 ///In general: If a perp gets more expensive than an underlying, longs will pay high funding fees.
 ///This leads to longs selling the perp, returning price to neutral.
 contract EverlastingOptions {
+    //storage
+    IERC20 dai;
 
+    enum Direction {
+        Short,
+        Long
+    }
+
+    struct Position {
+        address user;
+        uint256 strike;
+        Direction direction;
+    }
+
+    uint256 positionId;
+    uint256 priceCount;
+    uint256 avgPrice;
+
+    mapping(uint256 => Position) public idToPosition;
+
+    //ERRORS
+    error TransferFailed();
+
+    //EVENTS
+    event ReserveDeposit(address indexed user, uint256 value);
+
+    constructor(address _daiAddr) {
+        dai = IERC20(_daiAddr);
+    }
+
+    function depositShort(uint256 _daiAmt, uint256 _strike)
+        public
+        returns (bool)
+    {
+        bool deposit = dai.transferFrom(msg.sender, address(this), _daiAmt);
+        if (!deposit) revert TransferFailed();
+
+        ++positionId;
+
+        idToPosition[positionId] = Position(
+            msg.sender,
+            _strike,
+            Direction.Short
+        );
+
+        return true;
+    }
+
+    function withdrawShort() public {}
+
+    function depositLong() public {}
+
+    function withdrawLong() public {}
+
+    function calcAvgPrice() public {
+        ++priceCount;
+        uint256 spot = getSpotPrice();
+        uint256 diff = (spot - avgPrice) / priceCount;
+        uint256 newAvgPrice = avgPrice + diff;
+    }
+
+    function getSpotPrice() public view returns (uint256) {
+        //oracle
+        uint256 spot;
+        return spot;
+    }
+
+    function calcPayoff(uint256 _strike, uint256 _spot)
+        public
+        view
+        returns (uint256)
+    {
+        _spot = getSpotPrice();
+        uint256 payoff;
+
+        if (_strike > _spot) {
+            payoff = (_strike - _spot);
+        } else {
+            payoff = 0;
+        }
+        return payoff;
+    }
+
+    function calcFundingFee(uint256 _strike, uint256 _spot)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 payoff = calcPayoff(_strike, _spot);
+        uint256 mark = _spot;
+
+        uint256 fee = (mark - payoff);
+
+        return fee;
+    }
+
+    function liquidations() public {}
+
+    receive() external payable {
+        emit ReserveDeposit(msg.sender, msg.value);
+    }
 }
