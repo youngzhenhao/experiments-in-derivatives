@@ -3,7 +3,7 @@ pragma solidity >=0.8.7 <0.9.0;
 
 import "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import "./PriceFeedConsumer.sol";
+import "./oracle/PriceFeedConsumer.sol";
 
 ///@title COVERED OPTIONS
 ///@author tobias

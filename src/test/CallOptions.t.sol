@@ -8,7 +8,7 @@ import "forge-std/console.sol";
 import "./mocks/MockV3Aggregator.sol";
 import "./mocks/MockERC20.sol";
 
-import "../PriceFeedConsumer.sol";
+import "../oracle/PriceFeedConsumer.sol";
 import "../CallOptions.sol";
 
 contract CallOptionsTest is DSTest {
