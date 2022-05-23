@@ -13,7 +13,6 @@ import "../CallOptions.sol";
 
 contract CallOptionsTest is DSTest {
     //Setup contracts
-
     Vm public constant vm = Vm(HEVM_ADDRESS);
     CallOptions public call;
     MockERC20 public dai;
@@ -114,11 +113,11 @@ contract CallOptionsTest is DSTest {
 
     //Create a call option
     function testFail_writeCallOption() public {
-        call.writeCallOption{value: 1 ether}(0, 1, 1);
+        call.sellCall{value: 1 ether}(0, 1, 1);
     }
 
     function test_writeCallOption() public {
-        call.writeCallOption{value: 1 ether}(1 ether, 1, 1);
+        call.sellCall{value: 1 ether}(1 ether, 1, 1);
     }
 
     function test_writeCallOptionFuzz(
@@ -127,16 +126,12 @@ contract CallOptionsTest is DSTest {
         uint96 _secondsToExpiry
     ) public {
         _strike = 1 ether;
-        call.writeCallOption{value: 1 ether}(
-            _strike,
-            _premiumDue,
-            _secondsToExpiry
-        );
+        call.sellCall{value: 1 ether}(_strike, _premiumDue, _secondsToExpiry);
     }
 
     function test_writeCallOptionId() public {
-        uint256 id1 = call.writeCallOption{value: 1 ether}(1 ether, 1, 1);
-        uint256 id2 = call.writeCallOption{value: 1 ether}(1 ether, 1, 1);
+        uint256 id1 = call.sellCall{value: 1 ether}(1 ether, 1, 1);
+        uint256 id2 = call.sellCall{value: 1 ether}(1 ether, 1, 1);
         assertEq(id1 + 1, id2);
     }
 
@@ -146,46 +141,46 @@ contract CallOptionsTest is DSTest {
         //the event expected
         emit CallOptionOpen(address(this), 1, 1, 1 ether);
         //emits the event
-        call.writeCallOption{value: 1 ether}(1 ether, 1, 1);
+        call.sellCall{value: 1 ether}(1 ether, 1, 1);
     }
 
     function testFail_emitOpenOption() public {
         vm.expectEmit(true, true, false, false);
         emit CallOptionOpen(address(0x1), 1, 1, 1 ether);
-        call.writeCallOption{value: 1 ether}(1 ether, 1, 1);
+        call.sellCall{value: 1 ether}(1 ether, 1, 1);
     }
 
     function testCannot_writeCallOptionWithWrongValue() public {
         vm.expectRevert(Unauthorized.selector);
-        call.writeCallOption{value: 1 ether}(1 wei, 1 wei, 60);
+        call.sellCall{value: 1 ether}(1 wei, 1 wei, 60);
     }
 
     //Buy a Call Option
     function test_buyCallOption() public {
-        call.writeCallOption{value: 1 wei}(1 wei, 1 wei, 60);
+        call.sellCall{value: 1 wei}(1 wei, 1 wei, 60);
         dai.approve(address(call), 1e8);
-        call.buyCallOption(1);
+        call.buyCall(1);
     }
 
     function testFail_buyCallOption() public {
-        call.writeCallOption{value: 1 wei}(1 wei, 1 wei, 60);
+        call.sellCall{value: 1 wei}(1 wei, 1 wei, 60);
         dai.approve(address(call), 1e8);
-        call.buyCallOption(0);
+        call.buyCall(0);
     }
 
     function test_emitBoughtOption() public {
-        call.writeCallOption{value: 1 wei}(1 wei, 1, 1);
+        call.sellCall{value: 1 wei}(1 wei, 1, 1);
         dai.approve(address(call), 1e8);
 
         vm.expectEmit(true, false, false, false);
         emit CallOptionBought(address(this), 1);
-        call.buyCallOption(1);
+        call.buyCall(1);
     }
 
     function testCannot_buyOptionWithWrongIdFuzz(uint96 _id) public {
         vm.assume(_id > 1);
         vm.expectRevert(Unauthorized.selector);
-        call.buyCallOption(_id);
+        call.buyCall(_id);
     }
 
     //TODO: Test chainlink price feed called in functions

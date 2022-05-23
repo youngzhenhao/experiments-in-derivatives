@@ -8,6 +8,7 @@ import "./oracle/PriceFeedConsumer.sol";
 ///@title COVERED OPTIONS
 ///@author tobias
 ///@notice This Smart Contract allows for the buying/writing Cash-Secured Puts with ETH as the underlying.
+
 /// As an Example, use Chainlink DAI/ETH Price Feed.
 /// Puts: Let you sell an asset at a set price on a specific date.
 /// Cash-Secured Put: The writer transfers ETH for collateral. Buyer pays premium w DAI.
@@ -20,23 +21,28 @@ import "./oracle/PriceFeedConsumer.sol";
 /// Cash-secured Puts - Writer earns yield on cash (Bullish).
 
 contract PutOptions is ReentrancyGuard {
-    ///-----------------------------------------///
-    ///--------------STORAGE
-    ///----------------------------------------///
+    error Unauthorized();
+    error TransferFailed();
+    error OptionNotValid(uint256 _optionId);
+
+    event PutOptionOpen(
+        address indexed writer,
+        uint256 id,
+        uint256 expiration,
+        uint256 value
+    );
+    event PutOptionBought(address indexed buyer, uint256 id);
+    event PutOptionExercised(address indexed buyer, uint256 id);
+    event OptionExpiresWorthless(address indexed buyer, uint256 Id);
+    event FundsRetrieved(address indexed writer, uint256 id, uint256 value);
 
     PriceFeedConsumer internal priceFeed;
-
     IERC20 dai;
-
     uint256 public optionId;
 
     mapping(address => address) public tokenToEthFeed;
     mapping(uint256 => Option) public optionIdToOption;
     mapping(address => uint256[]) public tradersPosition;
-
-    ///-----------------------------------------///
-    ///--------------ENUMS & STRUCTS
-    ///----------------------------------------///
 
     enum OptionState {
         Open,
@@ -44,7 +50,6 @@ contract PutOptions is ReentrancyGuard {
         Cancelled,
         Exercised
     }
-
     enum OptionType {
         Call,
         Put
@@ -61,34 +66,6 @@ contract PutOptions is ReentrancyGuard {
         OptionType optionType;
     }
 
-    ///-----------------------------------------///
-    ///--------------ERRORS
-    ///----------------------------------------///
-
-    error Unauthorized();
-    error TransferFailed();
-    error OptionNotValid(uint256 _optionId);
-
-    ///-----------------------------------------///
-    ///--------------EVENTS
-    ///----------------------------------------///
-
-    event PutOptionOpen(
-        address indexed writer,
-        uint256 id,
-        uint256 expiration,
-        uint256 value
-    );
-
-    event PutOptionBought(address indexed buyer, uint256 id);
-    event PutOptionExercised(address indexed buyer, uint256 id);
-    event OptionExpiresWorthless(address indexed buyer, uint256 Id);
-    event FundsRetrieved(address indexed writer, uint256 id, uint256 value);
-
-    ///-----------------------------------------///
-    ///--------------MODIFIERS
-    ///----------------------------------------///
-
     modifier optionExists(uint256 id) {
         if (optionIdToOption[id].writer == address(0))
             revert OptionNotValid(id);
@@ -103,21 +80,14 @@ contract PutOptions is ReentrancyGuard {
         _;
     }
 
-    ///-----------------------------------------///
-    ///--------------CONSTRUCTOR
-    ///----------------------------------------///
-
+    //CONSTRUCTOR
     constructor(address _daiAddr) {
         dai = IERC20(_daiAddr);
     }
 
-    ///-----------------------------------------///
-    ///--------------PUT OPTION FUNCTIONS
-    ///----------------------------------------///
-
     ///@dev Open a put option.
     ///ETH collateral(msg.value) must equal strike. In practice, there would be different strike options on the frontend.
-    function writePutOption(
+    function sellPut(
         uint256 _strike,
         uint256 _premiumDue,
         uint256 _secondsToExpiry
@@ -151,7 +121,7 @@ contract PutOptions is ReentrancyGuard {
     }
 
     ///@dev Buy an available put option, for this example, we use DAI
-    function buyPutOption(uint256 _optionId) external nonReentrant {
+    function buyPut(uint256 _optionId) external nonReentrant {
         Option memory option = optionIdToOption[_optionId];
 
         if (

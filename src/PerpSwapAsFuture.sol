@@ -1,4 +1,5 @@
 //IN PROGRESS...
+
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.7 <0.9.0;
 
@@ -6,10 +7,13 @@ import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "./oracle/PriceFeedConsumer.sol/";
 
 ///@notice A Perpetual Swap: The trader gets futures exposure with no need to roll the position.
+
 ///Trader can hold the position as long as they want as long as they have the margin.
 ///Everyday, traders who are long pay a "funding fee" to those who are short.
+
 ///Funding Fee = (mark price - index price)
 ///Mark price == current perp price. Index price == underlying price.
+
 ///In general: If a perp gets more expensive than an underlying, longs will pay high funding fees.
 ///This leads to longs selling the perp, returning price to neutral.
 

@@ -3,8 +3,9 @@ pragma solidity >=0.8.7 <0.9.0;
 
 import "ds-test/test.sol";
 import "forge-std/stdlib.sol";
+
 import "./mocks/MockV3Aggregator.sol";
-import "../PriceFeedConsumer.sol";
+import "../oracle/PriceFeedConsumer.sol";
 
 contract PriceFeedConsumerTest is DSTest {
     Vm public constant vm = Vm(HEVM_ADDRESS);

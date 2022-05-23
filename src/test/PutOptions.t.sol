@@ -13,7 +13,6 @@ import "../PutOptions.sol";
 
 contract PutOptionsTest is DSTest {
     //Setup contracts
-
     Vm public constant vm = Vm(HEVM_ADDRESS);
     PutOptions public put;
     MockERC20 public dai;
@@ -91,28 +90,28 @@ contract PutOptionsTest is DSTest {
 
     //Create a put option
     function testFail_writePutOption() public {
-        put.writePutOption{value: 1 ether}(0, 1, 1);
+        put.sellPut{value: 1 ether}(0, 1, 1);
     }
 
     function test_writePutOption() public {
-        put.writePutOption{value: 1 ether}(1 ether, 1, 1);
+        put.sellPut{value: 1 ether}(1 ether, 1, 1);
     }
 
     function test_emitOpenOption() public {
         vm.expectEmit(true, true, false, false);
         emit PutOptionOpen(address(this), 1, 1, 1 ether);
-        put.writePutOption{value: 1 ether}(1 ether, 1, 1);
+        put.sellPut{value: 1 ether}(1 ether, 1, 1);
     }
 
     function testFail_emitOpenOption() public {
         vm.expectEmit(true, true, false, false);
         emit PutOptionOpen(address(0x1), 1, 1, 1 ether);
-        put.writePutOption{value: 1 ether}(1 ether, 1, 1);
+        put.sellPut{value: 1 ether}(1 ether, 1, 1);
     }
 
     function testCannot_writePutOptionWithWrongValue() public {
         vm.expectRevert(Unauthorized.selector);
-        put.writePutOption{value: 1 ether}(1 wei, 1 wei, 60);
+        put.sellPut{value: 1 ether}(1 wei, 1 wei, 60);
     }
 
     function test_writePutOptionFuzz(
@@ -121,28 +120,24 @@ contract PutOptionsTest is DSTest {
         uint96 _secondsToExpiry
     ) public {
         _strike = 1 ether;
-        put.writePutOption{value: 1 ether}(
-            _strike,
-            _premiumDue,
-            _secondsToExpiry
-        );
+        put.sellPut{value: 1 ether}(_strike, _premiumDue, _secondsToExpiry);
     }
 
     //Buy a Put Option
     function test_buyPutOption() public {
-        put.writePutOption{value: 1 wei}(1 wei, 1 wei, 60);
+        put.sellPut{value: 1 wei}(1 wei, 1 wei, 60);
         dai.approve(address(put), 1e8);
-        put.buyPutOption(1);
+        put.buyPut(1);
     }
 
     function testFail_buyPutOption() public {
-        put.writePutOption{value: 1 wei}(1 wei, 1 wei, 60);
+        put.sellPut{value: 1 wei}(1 wei, 1 wei, 60);
         dai.approve(address(put), 1e8);
-        put.buyPutOption(7);
+        put.buyPut(7);
     }
 
     function test_emitBoughtOption() public {
-        put.writePutOption{value: 1 wei}(1 wei, 1, 1);
+        put.sellPut{value: 1 wei}(1 wei, 1, 1);
         dai.approve(address(put), 1e8);
 
         //check topic 1, but not data
@@ -150,14 +145,14 @@ contract PutOptionsTest is DSTest {
         //the event expected
         emit PutOptionBought(address(this), 1);
         //the event we get
-        put.buyPutOption(1);
+        put.buyPut(1);
     }
 
     function testCannot_buyOptionWithWrongId(uint96 _id) public {
         vm.assume(_id > 1);
         vm.expectRevert(Unauthorized.selector);
-        put.buyPutOption(_id);
+        put.buyPut(_id);
     }
 
-    //TODO: Figure a test chainlink price feed called in functions
+    //TODO: test chainlink price feed called in functions
 }

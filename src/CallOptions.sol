@@ -5,38 +5,44 @@ import "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "./oracle/PriceFeedConsumer.sol";
 
-///@title COVERED OPTIONS
-///@author tobias
-///@notice This Smart Contract allows for the buying/writing of Covered Calls with ETH as the underlying.
-/// As an Example, use Chainlink DAI/ETH Price Feed.
-/// Calls: Let you buy an asset at a set price on a specific date.
-/// Covered Call: The seller(writer) transfers ETH for collateral and writes a Covered Call. The buyer pays premium w DAI.
-/// Covered Call: At expiration, the buyer has right to ETH at strike price if market price is greater than strike price. Settles with DAI.
-/// All options have the following properties:
-/// Strike price - The price at which the underlying asset can either be bought or sold.
-/// Expiry - The date at which the option expires.
-/// Premium - The price of the options contract.
-/// Probable strategy for option writer:
-///1. Covered Calls - You sell upside on an asset while you hold it for yield, which comes from premium (Netural/Bullish on asset).
+// @title COVERED CALL OPTIONS
+// @author tobias
+// @notice This Smart Contract allows for the buying/writing of Covered Calls with ETH as the underlying.
+
+// As an Example, use Chainlink DAI/ETH Price Feed.
+// Calls: Let you buy an asset at a set price on a specific date.
+// Covered Call: The seller(writer) transfers ETH for collateral and writes a Covered Call. The buyer pays premium w DAI.
+// Covered Call: At expiration, the buyer has right to ETH at strike price if market price is greater than strike price. Settles with DAI.
+// All options have the following properties:
+// Strike price - The price at which the underlying asset can either be bought or sold.
+// Expiry - The date at which the option expires.
+// Premium - The price of the options contract.
+// Probable strategy for option writer:
+// Covered Calls - You sell upside on an asset while you hold it for yield, which comes from premium (Netural/Bullish on asset).
 
 contract CallOptions is ReentrancyGuard {
-    ///-----------------------------------------///
-    ///--------------STORAGE
-    ///----------------------------------------///
+    error Unauthorized();
+    error TransferFailed();
+    error OptionNotValid(uint256 _optionId);
+
+    event CallOptionOpen(
+        address indexed writer,
+        uint256 id,
+        uint256 expiration,
+        uint256 value
+    );
+    event CallOptionBought(address indexed buyer, uint256 id);
+    event CallOptionExercised(address indexed buyer, uint256 id);
+    event OptionExpiresWorthless(address indexed buyer, uint256 Id);
+    event FundsRetrieved(address indexed writer, uint256 id, uint256 value);
 
     PriceFeedConsumer internal priceFeed;
-
     IERC20 dai;
-
     uint256 public optionId;
 
     mapping(address => address) public tokenToEthFeed;
     mapping(uint256 => Option) public optionIdToOption;
     mapping(address => uint256[]) public tradersPosition;
-
-    ///-----------------------------------------///
-    ///--------------ENUMS & STRUCTS
-    ///----------------------------------------///
 
     enum OptionState {
         Closed,
@@ -45,7 +51,6 @@ contract CallOptions is ReentrancyGuard {
         Cancelled,
         Exercised
     }
-
     enum OptionType {
         Call,
         Put
@@ -62,33 +67,6 @@ contract CallOptions is ReentrancyGuard {
         OptionType optionType;
     }
 
-    ///-----------------------------------------///
-    ///--------------ERRORS
-    ///----------------------------------------///
-
-    error Unauthorized();
-    error TransferFailed();
-    error OptionNotValid(uint256 _optionId);
-
-    ///-----------------------------------------///
-    ///--------------EVENTS
-    ///----------------------------------------///
-
-    event CallOptionOpen(
-        address indexed writer,
-        uint256 id,
-        uint256 expiration,
-        uint256 value
-    );
-    event CallOptionBought(address indexed buyer, uint256 id);
-    event CallOptionExercised(address indexed buyer, uint256 id);
-    event OptionExpiresWorthless(address indexed buyer, uint256 Id);
-    event FundsRetrieved(address indexed writer, uint256 id, uint256 value);
-
-    ///-----------------------------------------///
-    ///--------------MODIFIERS
-    ///----------------------------------------///
-
     modifier optionExists(uint256 id) {
         if (optionIdToOption[id].writer == address(0))
             revert OptionNotValid(id);
@@ -103,21 +81,13 @@ contract CallOptions is ReentrancyGuard {
         _;
     }
 
-    ///-----------------------------------------///
-    ///--------------CONSTRUCTOR
-    ///----------------------------------------///
-
-    ///Kovan DAI Addr: 0x4f96fe3b7a6cf9725f59d353f723c1bdb64ca6aa
+    //CONSTRUCTOR
     constructor(address _daiAddr) {
         dai = IERC20(_daiAddr);
     }
 
-    ///-----------------------------------------///
-    ///--------------CALL OPTION FUNCTIONS
-    ///----------------------------------------///
-
     ///@dev Write a call option against ETH collateral
-    function writeCallOption(
+    function sellCall(
         uint256 _strike,
         uint256 _premiumDue,
         uint256 _secondsToExpiry
@@ -152,7 +122,7 @@ contract CallOptions is ReentrancyGuard {
     }
 
     ///@dev Buy an available call option.
-    function buyCallOption(uint256 _optionId) external nonReentrant {
+    function buyCall(uint256 _optionId) external nonReentrant {
         Option memory option = optionIdToOption[_optionId];
 
         if (
@@ -176,7 +146,7 @@ contract CallOptions is ReentrancyGuard {
     }
 
     ///@dev Buyer gets to exercise the option is spot price > strike after expiration.
-    function exerciseCallOption(uint256 _optionId, uint256 _amount)
+    function exerciseCall(uint256 _optionId, uint256 _amount)
         external
         payable
         optionExists(_optionId)
@@ -213,10 +183,6 @@ contract CallOptions is ReentrancyGuard {
 
         emit CallOptionExercised(msg.sender, _optionId);
     }
-
-    ///-----------------------------------------///
-    ///--------------ADDITIONAL FUNCTIONS
-    ///----------------------------------------///
 
     ///@dev Cancel Option after expiration and if it's worthless
     ///In practice, a function like this would probably get run by the protocol

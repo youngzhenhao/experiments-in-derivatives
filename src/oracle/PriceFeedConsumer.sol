@@ -4,14 +4,7 @@ pragma solidity >=0.8.7 <0.9.0;
 import "chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 contract PriceFeedConsumer {
-    ///-----------------------------------------///
-    ///--------------STORAGE
-    ///----------------------------------------///
     AggregatorV3Interface internal immutable priceFeed;
-
-    ///-----------------------------------------///
-    ///--------------CONSTRUCTOR
-    ///----------------------------------------///
 
     ///CHAINLINK PRICEFEEDS FOR EASE OF USE
     ///NETWORK: KOVAN
@@ -21,10 +14,6 @@ contract PriceFeedConsumer {
     constructor(address _priceFeed) {
         priceFeed = AggregatorV3Interface(_priceFeed);
     }
-
-    ///-----------------------------------------///
-    ///--------------ORACLE(CHAINLINK) FUNCTIONS
-    ///----------------------------------------///
 
     function getPriceFeed(uint256 _amount) public view returns (uint256) {
         (, int256 price, , , ) = priceFeed.latestRoundData();
