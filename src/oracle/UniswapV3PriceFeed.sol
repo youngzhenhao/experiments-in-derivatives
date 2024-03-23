@@ -3,8 +3,8 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.7.6 <0.9.0; //UniswapV3 requires 0.7.6
 
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
+import "../uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "../uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
 
 contract UniswapV3Twap {
     address public immutable token0;
@@ -55,7 +55,7 @@ contract UniswapV3Twap {
         int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
 
         // int56 / uint32 = int24
-        int24 tick = int24(tickCumulativesDelta / secondsAgo);
+        int24 tick = int24(tickCumulativesDelta / int256(uint256(secondsAgo)));
         // Always round to negative infinity
         /*
         int doesn't round down when it is negative
@@ -67,7 +67,7 @@ contract UniswapV3Twap {
         down
         */
         if (
-            tickCumulativesDelta < 0 && (tickCumulativesDelta % secondsAgo != 0)
+            tickCumulativesDelta < 0 && (tickCumulativesDelta % int256(uint256(secondsAgo)) != 0)
         ) {
             tick--;
         }

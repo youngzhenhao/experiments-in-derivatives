@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.7 <0.9.0;
 
-import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 ///@notice An Everlasting Option: Are the same as perpetual futures, but for options.
 ///The trader gets exposure with no need to roll the position. There is No expiration.
