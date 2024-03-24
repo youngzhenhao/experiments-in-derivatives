@@ -29,6 +29,10 @@ This repo is built with [Foundry](https://github.com/gakonst/foundry).
 forge 0.2.0
 ```
 
+### layout
+
+https://book.getfoundry.sh/projects/project-layout
+
 ---
 
 ## Foundry
