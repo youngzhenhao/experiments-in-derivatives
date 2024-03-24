@@ -2,7 +2,7 @@
 pragma solidity >=0.8.7 <0.9.0;
 
 import "ds-test/test.sol";
-import "forge-std/stdlib.sol";
+import "forge-std/StdStorage.sol";
 import "forge-std/console.sol";
 
 import "./mocks/MockV3Aggregator.sol";
