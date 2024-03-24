@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: WTFPL
 pragma solidity >=0.5.16;
 
-import './interfaces/IUniswapV2ERC20.sol';
-import './libraries/SafeMath.sol';
+import {IUniswapV2ERC20} from './interfaces/IUniswapV2ERC20.sol';
+import {SafeMath} from './libraries/SafeMath.sol';
 
 contract UniswapV2ERC20 is IUniswapV2ERC20 {
     using SafeMath for uint;
@@ -21,10 +22,10 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
     event Approval(address indexed owner, address indexed spender, uint value);
     event Transfer(address indexed from, address indexed to, uint value);
 
-    constructor() public {
+    constructor() {
         uint chainId;
         assembly {
-            chainId := chainid
+            chainId := chainid()
         }
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
@@ -71,7 +72,7 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
     }
 
     function transferFrom(address from, address to, uint value) external returns (bool) {
-        if (allowance[from][msg.sender] != uint(-1)) {
+        if (allowance[from][msg.sender] != type(uint).max) {
             allowance[from][msg.sender] = allowance[from][msg.sender].sub(value);
         }
         _transfer(from, to, value);
