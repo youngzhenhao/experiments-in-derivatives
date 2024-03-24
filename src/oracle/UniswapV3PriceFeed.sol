@@ -3,8 +3,8 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.7.6 <0.9.0; //UniswapV3 requires 0.7.6
 
-import "../uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import "../uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
 
 contract UniswapV3Twap {
     address public immutable token0;
