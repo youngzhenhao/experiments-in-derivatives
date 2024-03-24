@@ -5,7 +5,7 @@ import "ds-test/test.sol";
 import "forge-std/stdlib.sol";
 
 import "./mocks/MockV3Aggregator.sol";
-import "../oracle/PriceFeedConsumer.sol";
+import "../src/oracle/PriceFeedConsumer.sol";
 
 contract PriceFeedConsumerTest is DSTest {
     Vm public constant vm = Vm(HEVM_ADDRESS);

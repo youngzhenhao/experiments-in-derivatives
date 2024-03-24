@@ -7,9 +7,9 @@ solc = "0.8.22"
 # See more config options https://github.com/gakonst/foundry/tree/master/config
 
 remappings = [
-    '@openzeppelin=edited/openzeppelin',
-    '@uniswap/v3-core=edited/uniswap/v3-core',
-    '@uniswap/v3-periphery=edited/uniswap/v3-periphery',
+    '@openzeppelin=modified/openzeppelin',
+    '@uniswap/v3-core=modified/uniswap/v3-core',
+    '@uniswap/v3-periphery=modified/uniswap/v3-periphery',
     '@chainlink/=lib/chainlink-brownie-contracts/',
     'solmate/=lib/solmate/src/',
     'ds-test/=lib/ds-test/src/',

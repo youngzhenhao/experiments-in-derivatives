@@ -8,8 +8,8 @@ import "forge-std/console.sol";
 import "./mocks/MockV3Aggregator.sol";
 import "./mocks/MockERC20.sol";
 
-import "../oracle/PriceFeedConsumer.sol";
-import "../CallOptions.sol";
+import "../src/oracle/PriceFeedConsumer.sol";
+import "../src/CallOptions.sol";
 
 contract CallOptionsTest is DSTest {
     //Setup contracts
@@ -25,15 +25,11 @@ contract CallOptionsTest is DSTest {
 
     //forge std lib
     using stdStorage for StdStorage;
+
     StdStorage public stdstore;
 
     //Events
-    event CallOptionOpen(
-        address indexed writer,
-        uint256 id,
-        uint256 expiration,
-        uint256 value
-    );
+    event CallOptionOpen(address indexed writer, uint256 id, uint256 expiration, uint256 value);
     event CallOptionBought(address indexed buyer, uint256 id);
 
     //Errors
@@ -120,11 +116,7 @@ contract CallOptionsTest is DSTest {
         call.sellCall{value: 1 ether}(1 ether, 1, 1);
     }
 
-    function test_writeCallOptionFuzz(
-        uint96 _strike,
-        uint96 _premiumDue,
-        uint96 _secondsToExpiry
-    ) public {
+    function test_writeCallOptionFuzz(uint96 _strike, uint96 _premiumDue, uint96 _secondsToExpiry) public {
         _strike = 1 ether;
         call.sellCall{value: 1 ether}(_strike, _premiumDue, _secondsToExpiry);
     }

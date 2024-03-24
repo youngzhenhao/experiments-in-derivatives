@@ -8,8 +8,8 @@ import "forge-std/console.sol";
 import "./mocks/MockV3Aggregator.sol";
 import "./mocks/MockERC20.sol";
 
-import "../oracle/PriceFeedConsumer.sol";
-import "../PutOptions.sol";
+import "../src/oracle/PriceFeedConsumer.sol";
+import "../src/PutOptions.sol";
 
 contract PutOptionsTest is DSTest {
     //Setup contracts
@@ -25,15 +25,11 @@ contract PutOptionsTest is DSTest {
 
     //forge std lib
     using stdStorage for StdStorage;
+
     StdStorage public stdstore;
 
     //Events
-    event PutOptionOpen(
-        address indexed writer,
-        uint256 id,
-        uint256 expiration,
-        uint256 value
-    );
+    event PutOptionOpen(address indexed writer, uint256 id, uint256 expiration, uint256 value);
     event PutOptionBought(address indexed buyer, uint256 id);
 
     //Errors
@@ -114,11 +110,7 @@ contract PutOptionsTest is DSTest {
         put.sellPut{value: 1 ether}(1 wei, 1 wei, 60);
     }
 
-    function test_writePutOptionFuzz(
-        uint96 _strike,
-        uint96 _premiumDue,
-        uint96 _secondsToExpiry
-    ) public {
+    function test_writePutOptionFuzz(uint96 _strike, uint96 _premiumDue, uint96 _secondsToExpiry) public {
         _strike = 1 ether;
         put.sellPut{value: 1 ether}(_strike, _premiumDue, _secondsToExpiry);
     }
